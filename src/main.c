@@ -11,19 +11,22 @@
 #define STATUS_LED_INTERVAL 500
 #define APP_LED             DK_LED1
 
+#define LED_THREAD_STACK_SIZE 500
+#define LED_THREAD_PRIORITY   5
+
 LOG_MODULE_REGISTER(APP);
 
-static void led_timer_handler(struct k_timer *timer_id);
-K_TIMER_DEFINE(led_timer, led_timer_handler, NULL);
-
-static void led_timer_handler(struct k_timer *timer_id)
+static void led_thread(void)
 {
-	int err = 0;
-	static int cnt = 0;
+	int cnt = 0;
 
-	err = dk_set_led(STATUS_LED, cnt++%2);
-	if (err) {
-		LOG_ERR("Failed to set the LED. Error %d", err);
+	while (true) {
+		int err = dk_set_led(STATUS_LED, cnt++%2);
+		if (err) {
+			LOG_ERR("Failed to set the LED. Error %d", err);
+		}
+
+		k_msleep(STATUS_LED_INTERVAL);
 	}
 }
 
@@ -77,7 +80,8 @@ void main(void)
 
 	init_leds();
 	init_buttons();
-
-	// Start status LED timer.
-	k_timer_start(&led_timer, K_MSEC(STATUS_LED_INTERVAL), K_MSEC(STATUS_LED_INTERVAL));
 }
+
+K_THREAD_DEFINE(led_tid, LED_THREAD_STACK_SIZE,
+                (k_thread_entry_t)led_thread, NULL, NULL, NULL,
+                LED_THREAD_PRIORITY, 0, 0);
