@@ -7,6 +7,9 @@
 
 #include <dk_buttons_and_leds.h>
 
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/device.h>
+
 #define STATUS_LED          DK_LED4
 #define STATUS_LED_INTERVAL 500
 #define APP_LED             DK_LED1
@@ -14,10 +17,9 @@
 #define LED_THREAD_STACK_SIZE 500
 #define LED_THREAD_PRIORITY   5
 
-#define PWM_THREAD_STACK_SIZE 500
-#define PWM_THREAD_PRIORITY   5
-
 #define PWM_LEVEL_MAX 10
+
+static const struct pwm_dt_spec pwm_led0 = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led0));
 
 LOG_MODULE_REGISTER(APP);
 
@@ -34,24 +36,6 @@ static void led_thread(void)
 		}
 
 		k_msleep(STATUS_LED_INTERVAL);
-	}
-}
-
-static void pwm_thread(void)
-{
-	while(1) {
-		if (pwm_level) {
-			int active_time_ms   = pwm_level;
-			int inactive_time_ms = (PWM_LEVEL_MAX - 1) - active_time_ms;
-
-			dk_set_led_on(APP_LED);
-			k_msleep(active_time_ms);
-			dk_set_led_off(APP_LED);
-			k_msleep(inactive_time_ms);
-		}
-		else {
-			k_msleep(100);
-		}
 	}
 }
 
@@ -77,6 +61,11 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 		if (pwm_level < PWM_LEVEL_MAX) {
 			pwm_level++;
 		}
+	}
+
+	err = pwm_set_dt(&pwm_led0, 1000, 1000 * pwm_level / PWM_LEVEL_MAX);
+	if (err) {
+		LOG_ERR("Failed to set pulse width. Error %d", err);
 	}
 }
 
@@ -108,7 +97,3 @@ void main(void)
 K_THREAD_DEFINE(led_tid, LED_THREAD_STACK_SIZE,
                 (k_thread_entry_t)led_thread, NULL, NULL, NULL,
                 LED_THREAD_PRIORITY, 0, 0);
-
-K_THREAD_DEFINE(pwm_tid, PWM_THREAD_STACK_SIZE,
-                (k_thread_entry_t)pwm_thread, NULL, NULL, NULL,
-                PWM_THREAD_PRIORITY, 0, 0);
