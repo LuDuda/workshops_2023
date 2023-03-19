@@ -12,6 +12,20 @@
 
 LOG_MODULE_REGISTER(APP);
 
+static void led_timer_handler(struct k_timer *timer_id);
+K_TIMER_DEFINE(led_timer, led_timer_handler, NULL);
+
+static void led_timer_handler(struct k_timer *timer_id)
+{
+	int err = 0;
+	static int cnt = 0;
+
+	err = dk_set_led(STATUS_LED, cnt++%2);
+	if (err) {
+		LOG_ERR("Failed to set the LED. Error %d", err);
+	}
+}
+
 static void init_leds(void)
 {
 	int err = dk_leds_init();
@@ -22,20 +36,11 @@ static void init_leds(void)
 
 void main(void)
 {
-	int err = 0;
-	int cnt = 0;
-
 	LOG_INF("Hello World!");
 	LOG_DBG("Board: %s", CONFIG_BOARD);
 
 	init_leds();
 
-	while (true) {
-		err = dk_set_led(STATUS_LED, cnt++%2);
-		if (err) {
-			LOG_ERR("Failed to set the LED. Error %d\n", err);
-		}
-
-		k_msleep(STATUS_LED_INTERVAL);
-	}
+	// Start status LED timer.
+	k_timer_start(&led_timer, K_MSEC(STATUS_LED_INTERVAL), K_MSEC(STATUS_LED_INTERVAL));
 }
